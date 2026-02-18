@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Simple Chat App</title>
+
+    <!-- SockJS -->
+    <script src="https://cdn.jsdelivr.net/npm/sockjs-client@1/dist/sockjs.min.js"></script>
+
+    <!-- Modern STOMP -->
+    <script src="https://cdn.jsdelivr.net/npm/@stomp/stompjs@7/bundles/stomp.umd.min.js"></script>
+
+    <style>
+        body {
+            margin: 0;
+            background: #0f0f0f;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            color: #fff;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+
+        .chat-container {
+            width: 400px;
+            height: 600px;
+            background: #1a1a1a;
+            border-radius: 16px;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.6);
+            overflow: hidden;
+        }
+
+        .chat-header {
+            padding: 16px;
+            text-align: center;
+            font-weight: 600;
+            border-bottom: 1px solid #2a2a2a;
+            letter-spacing: 1px;
+        }
+
+        .chat-messages {
+            flex: 1;
+            padding: 16px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .message {
+            max-width: 75%;
+            padding: 10px 14px;
+            border-radius: 12px;
+            font-size: 14px;
+            line-height: 1.4;
+            word-wrap: break-word;
+        }
+
+        .sent {
+            align-self: flex-end;
+            background: #2563eb;
+        }
+
+        .received {
+            align-self: flex-start;
+            background: #2a2a2a;
+        }
+
+        .sender {
+            font-size: 11px;
+            opacity: 0.6;
+            margin-bottom: 4px;
+        }
+
+        .chat-input {
+            display: flex;
+            padding: 12px;
+            border-top: 1px solid #2a2a2a;
+            background: #141414;
+        }
+
+        .chat-input input {
+            flex: 1;
+            background: #1f1f1f;
+            border: none;
+            border-radius: 8px;
+            padding: 10px;
+            color: white;
+            outline: none;
+        }
+
+        .chat-input button {
+            margin-left: 10px;
+            background: #2563eb;
+            border: none;
+            color: white;
+            padding: 10px 14px;
+            border-radius: 8px;
+            cursor: pointer;
+        }
+
+        .chat-input button:hover {
+            background: #1d4ed8;
+        }
+
+        .name-input {
+            padding: 10px;
+            border-bottom: 1px solid #2a2a2a;
+            background: #141414;
+        }
+
+        .name-input input {
+            width: 100%;
+            background: #1f1f1f;
+            border: none;
+            border-radius: 8px;
+            padding: 8px;
+            color: white;
+            outline: none;
+        }
+    </style>
+</head>
+<body>
+
+<div class="chat-container">
+    <div class="chat-header">REAL-TIME CHAT</div>
+
+    <div class="name-input">
+        <input id="senderInput" type="text" placeholder="Your name...">
+    </div>
+
+    <div id="chat" class="chat-messages"></div>
+
+    <div class="chat-input">
+        <input id="messageInput" type="text" placeholder="Type a message...">
+        <button id="sendMessage">Send</button>
+    </div>
+</div>
+
+<script>
+    let stompClient = null;
+
+    function connect() {
+        const socket = new SockJS('/chat');
+
+        stompClient = new StompJs.Client({
+            webSocketFactory: () => socket,
+            onConnect: () => {
+                stompClient.subscribe('/topic/messages', (message) => {
+                    showMessage(JSON.parse(message.body));
+                });
+            }
+        });
+
+        stompClient.activate();
+    }
+
+    function showMessage(message) {
+        const chat = document.getElementById('chat');
+        const currentUser = document.getElementById('senderInput').value;
+
+        const messageDiv = document.createElement('div');
+        messageDiv.classList.add('message');
+
+        if (message.sender === currentUser) {
+            messageDiv.classList.add('sent');
+        } else {
+            messageDiv.classList.add('received');
+        }
+
+        messageDiv.innerHTML = `
+            <div class="sender">${message.sender}</div>
+            <div>${message.content || message.message}</div>
+        `;
+
+        chat.appendChild(messageDiv);
+        chat.scrollTop = chat.scrollHeight;
+    }
+
+    function sendMessage() {
+        const sender = document.getElementById('senderInput').value.trim();
+        const content = document.getElementById('messageInput').value.trim();
+
+        if (!sender || !content) return;
+
+        stompClient.publish({
+            destination: "/app/sendMessage",
+            body: JSON.stringify({ sender, content })
+        });
+
+        document.getElementById('messageInput').value = '';
+    }
+
+    document.getElementById('sendMessage')
+        .addEventListener('click', sendMessage);
+
+    document.getElementById('messageInput')
+        .addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') sendMessage();
+        });
+
+    window.onload = connect;
+</script>
+
+</body>
+</html>
